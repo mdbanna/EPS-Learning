@@ -23,26 +23,49 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Prepare Flutter Project & Build APK
+      - name: Prepare Clean Flutter Project & Build APK
         run: |
-          # যদি ফাইলগুলো সাব-ফোল্ডারে থাকে তবে সেটিকে রুটে নিয়ে আসা
-          if [ -f "EPS_Learning_Flutter_App/pubspec.yaml" ]; then
-            cp -r EPS_Learning_Flutter_App/* .
+          # ১. রিপোজিটরির যেকোনো ফোল্ডার থেকে আমাদের lib ফোল্ডারটি খুঁজে ব্যাকআপ নেওয়া
+          MAIN_FILE=$(find . -name "main.dart" | head -n 1)
+          if [ -z "$MAIN_FILE" ]; then
+            echo "Error: main.dart খুঁজে পাওয়া যায়নি!"
+            exit 1
           fi
+          LIB_DIR=$(dirname "$MAIN_FILE")
+          cp -r "$LIB_DIR" /tmp/custom_lib
 
-          # আমাদের কাস্টম lib ফোল্ডার ও pubspec ব্যাকআপ রাখা
-          cp -r lib /tmp/lib_backup
-          cp pubspec.yaml /tmp/pubspec_backup.yaml
-
-          # ফ্রেশ অ্যান্ড্রয়েড প্ল্যাটফর্ম ফাইল তৈরি করা
+          # ২. সম্পূর্ণ নতুন ও পরিষ্কার একটি Flutter প্রজেক্ট তৈরি করা
+          mkdir /tmp/clean_app
+          cd /tmp/clean_app
           flutter create --platforms=android --org com.mdbanna --project-name eps_topik_bangla .
 
-          # আমাদের আসল কোড ও প্যাকেজ লিস্ট ফিরিয়ে আনা
-          rm -rf lib
-          cp -r /tmp/lib_backup lib
-          cp /tmp/pubspec_backup.yaml pubspec.yaml
+          # ৩. ডিফল্ট টেস্ট ফাইল মুছে আমাদের আসল lib ফোল্ডার বসানো
+          rm -rf lib test
+          cp -r /tmp/custom_lib ./lib
 
-          # ডিপেন্ডেন্সি ইনস্টল ও রিলিজ APK বিল্ড করা
+          # ৪. কোনো থার্ড-পার্টি প্যাকেজ কনফ্লিক্ট ছাড়াই ক্লিন pubspec.yaml তৈরি করা
+          cat << 'EOF' > pubspec.yaml
+          name: eps_topik_bangla
+          description: EPS-TOPIK Bangla Learning App
+          publish_to: 'none'
+          version: 1.0.0+1
+
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # ৫. ডিপেন্ডেন্সি সেটআপ ও সরাসরি Release APK বিল্ড করা
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
 
@@ -50,4 +73,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EPS-TOPIK-Bangla-App-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: /tmp/clean_app/build/app/outputs/flutter-apk/app-release.apk
