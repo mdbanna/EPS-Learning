@@ -21,20 +21,30 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Create Android Platform Files (if not present)
+      - name: Prepare Flutter Project & Build APK
         run: |
-          if [ ! -d "android" ]; then
-            flutter create --platforms=android --org com.mdbanna .
+          # যদি ফাইলগুলো সাব-ফোল্ডারে থাকে তবে সেটিকে রুটে নিয়ে আসা
+          if [ -f "EPS_Learning_Flutter_App/pubspec.yaml" ]; then
+            cp -r EPS_Learning_Flutter_App/* .
           fi
 
-      - name: Install Dependencies
-        run: flutter pub get
+          # আমাদের কাস্টম lib ফোল্ডার ও pubspec ব্যাকআপ রাখা
+          cp -r lib /tmp/lib_backup
+          cp pubspec.yaml /tmp/pubspec_backup.yaml
 
-      - name: Build Release APK
-        run: flutter build apk --release
+          # ফ্রেশ অ্যান্ড্রয়েড প্ল্যাটফর্ম ফাইল তৈরি করা
+          flutter create --platforms=android --org com.mdbanna --project-name eps_topik_bangla .
+
+          # আমাদের আসল কোড ও প্যাকেজ লিস্ট ফিরিয়ে আনা
+          rm -rf lib
+          cp -r /tmp/lib_backup lib
+          cp /tmp/pubspec_backup.yaml pubspec.yaml
+
+          # ডিপেন্ডেন্সি ইনস্টল ও রিলিজ APK বিল্ড করা
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
 
       - name: Upload Release APK as Artifact
         uses: actions/upload-artifact@v4
